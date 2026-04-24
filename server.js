@@ -129,8 +129,10 @@
         const srtPath = path.join(jobDir, 'subtitles.srt');
         fs.writeFileSync(srtPath, generateSRT(subtitle_segments), 'utf8');
         const escapedSrt = srtPath.replace(/\\/g, '/');
-        const subStyle = 'Fontname=DejaVu Sans
-  Bold,Fontsize=17,PrimaryColour=&H00FFFFFF,OutlineColour=&H00000000,Bold=1,Outline=4,Shadow=2,Alignment=2,MarginV=130';
+        const subStyle = 'Fontname=DejaVu Sans Bold' +
+          ',Fontsize=17,PrimaryColour=&H00FFFFFF' +
+          ',OutlineColour=&H00000000,Bold=1,Outline=4' +
+          ',Shadow=2,Alignment=2,MarginV=130';
         vfFilters.push("subtitles='" + escapedSrt + "':force_style='" + subStyle + "'");
         console.log('[' + jobId + '] Subtitulos: ' + subtitle_segments.length + ' segmentos');
       }
@@ -139,7 +141,7 @@
         const safeTitle = title.replace(/\\/g, '\\\\').replace(/'/g, "'").replace(/:/g, '\\:').substring(0, 60);
         const font = '/usr/share/fonts/dejavu/DejaVuSans-Bold.ttf';
         const dtFilter = "drawtext=text='" + safeTitle + "':fontfile='" + font +
-  "':fontsize=46:fontcolor=white:borderw=3:bordercolor=black:x=(w-text_w)/2:y=60";
+          "':fontsize=46:fontcolor=white:borderw=3:bordercolor=black:x=(w-text_w)/2:y=60";
         vfFilters.push(dtFilter);
       }
 
