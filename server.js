@@ -1,4 +1,4 @@
- const express = require('express');
+const express = require('express');
   const { spawn } = require('child_process');
   const fs = require('fs');
   const path = require('path');
@@ -42,19 +42,38 @@
     });
   }
 
-  function generateSRT(segments) {
-    const pad = (n, len) => String(Math.floor(n)).padStart(len, '0');
+  function generateASS(segments, width, height) {
     const toTC = (s) => {
-      const h = pad(s / 3600, 2);
-      const m = pad((s % 3600) / 60, 2);
-      const sec = pad(s % 60, 2);
-      const ms = pad((s % 1) * 1000, 3);
-      return h + ':' + m + ':' + sec + ',' + ms;
+      const h = Math.floor(s / 3600);
+      const m = Math.floor((s % 3600) / 60);
+      const sec = Math.floor(s % 60);
+      const cs = Math.floor((s % 1) * 100);
+      return String(h) + ':' +
+        String(m).padStart(2, '0') + ':' +
+        String(sec).padStart(2, '0') + '.' +
+        String(cs).padStart(2, '0');
     };
-    return segments.map((seg, i) => {
-      const ts = toTC(seg.start) + ' --> ' + toTC(seg.end);
-      return (i + 1) + '\n' + ts + '\n' + seg.text + '\n';
+    const fontSize = Math.round(height * 0.042);
+    const marginV = Math.round(height * 0.05);
+    const header =
+      '[Script Info]\n' +
+      'ScriptType: v4.00+\n' +
+      'PlayResX: ' + width + '\n' +
+      'PlayResY: ' + height + '\n\n' +
+      '[V4+ Styles]\n' +
+      'Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, ' +
+      'Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, ' +
+      'BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding\n' +
+      'Style: Default,DejaVu Sans,' + fontSize +
+      ',&H00FFFFFF,&H000000FF,&H00000000,&H80000000' +
+      ',-1,0,0,0,100,100,0,0,3,0,0,2,30,30,' + marginV + ',1\n\n' +
+      '[Events]\n' +
+      'Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n';
+    const events = segments.map((seg) => {
+      const text = seg.text.trim().replace(/\n/g, '\\N');
+      return 'Dialogue: 0,' + toTC(seg.start) + ',' + toTC(seg.end) + ',Default,,0,0,0,,' + text;
     }).join('\n');
+    return header + events + '\n';
   }
 
   app.get('/health', (req, res) => {
@@ -126,15 +145,11 @@
       vfFilters.push('vignette=PI/5');
 
       if (subtitle_segments && subtitle_segments.length > 0) {
-        const srtPath = path.join(jobDir, 'subtitles.srt');
-        fs.writeFileSync(srtPath, generateSRT(subtitle_segments), 'utf8');
-        const escapedSrt = srtPath.replace(/\\/g, '/');
-        const subStyle = 'Fontname=DejaVu Sans Bold' +
-          ',Fontsize=17,PrimaryColour=&H00FFFFFF' +
-          ',OutlineColour=&H00000000,Bold=1,Outline=4' +
-          ',Shadow=2,Alignment=2,MarginV=130';
-        vfFilters.push("subtitles='" + escapedSrt + "':force_style='" + subStyle + "'");
-        console.log('[' + jobId + '] Subtitulos: ' + subtitle_segments.length + ' segmentos');
+        const assPath = path.join(jobDir, 'subtitles.ass');
+        fs.writeFileSync(assPath, generateASS(subtitle_segments, width, height), 'utf8');
+        const escapedAss = assPath.replace(/\\/g, '/');
+        vfFilters.push("subtitles='" + escapedAss + "'");
+        console.log('[' + jobId + '] Subtitulos ASS: ' + subtitle_segments.length + ' segmentos');
       }
 
       if (title) {
