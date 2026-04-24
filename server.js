@@ -1,4 +1,4 @@
- const express = require('express');
+const express = require('express');
   const { spawn } = require('child_process');
   const fs = require('fs');
   const path = require('path');
@@ -53,8 +53,7 @@
 
     try {
       const {
-        audio_url, segments = [], title = '',
-        subtitle_segments = [], width = 1080, height = 1920
+        audio_url, segments = [], width = 1080, height = 1920
       } = req.body;
 
       if (!audio_url) throw new Error('audio_url is required');
@@ -105,46 +104,10 @@
       console.log('[' + jobId + '] Segments concatenated with crossfade');
 
       const outputPath = path.join(jobDir, 'output.mp4');
-      const vfFilters = [];
-
-      vfFilters.push('eq=saturation=1.2:contrast=1.07:brightness=0.02');
-      vfFilters.push('vignette=PI/5');
-
-      if (subtitle_segments && subtitle_segments.length > 0) {
-        const font = '/usr/share/fonts/dejavu/DejaVuSans-Bold.ttf';
-        const segs = subtitle_segments.slice(0, 30);
-        segs.forEach((seg) => {
-          const raw = (seg.text || '').trim().replace(/\n/g, ' ');
-          const text = raw
-            .replace(/\\/g, '\\\\\\\\')
-            .replace(/'/g, '\u2019')
-            .replace(/:/g, '\\:')
-            .replace(/%/g, '\\%')
-            .substring(0, 80);
-          if (!text) return;
-          const t0 = Number(seg.start).toFixed(3);
-          const t1 = Number(seg.end).toFixed(3);
-          vfFilters.push(
-            "drawtext=fontfile='" + font + "'" +
-            ":text='" + text + "'" +
-            ':fontsize=36' +
-            ':fontcolor=white' +
-            ':borderw=3:bordercolor=black@0.9' +
-            ':x=(w-text_w)/2' +
-            ':y=h-text_h-80' +
-            ":enable='between(t," + t0 + "," + t1 + ")'"
-          );
-        });
-        console.log('[' + jobId + '] Subtitulos drawtext: ' + segs.length + ' segmentos');
-      }
-
-      if (title) {
-        const safeTitle = title.replace(/\\/g, '\\\\').replace(/'/g, "'").replace(/:/g, '\\:').substring(0, 60);
-        const font = '/usr/share/fonts/dejavu/DejaVuSans-Bold.ttf';
-        const dtFilter = "drawtext=text='" + safeTitle + "':fontfile='" + font +
-          "':fontsize=46:fontcolor=white:borderw=3:bordercolor=black:x=(w-text_w)/2:y=60";
-        vfFilters.push(dtFilter);
-      }
+      const vfFilters = [
+        'eq=saturation=1.2:contrast=1.07:brightness=0.02',
+        'vignette=PI/5'
+      ];
 
       await runFFmpeg(['-i', concatPath, '-i', audioPath,
         '-vf', vfFilters.join(','),
