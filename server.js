@@ -1,4 +1,4 @@
-const express = require('express');
+ const express = require('express');
   const { spawn } = require('child_process');
   const fs = require('fs');
   const path = require('path');
@@ -40,40 +40,6 @@ const express = require('express');
       });
       proc.on('error', err => reject(new Error('FFmpeg spawn error: ' + err.message)));
     });
-  }
-
-  function generateASS(segments, width, height) {
-    const toTC = (s) => {
-      const h = Math.floor(s / 3600);
-      const m = Math.floor((s % 3600) / 60);
-      const sec = Math.floor(s % 60);
-      const cs = Math.floor((s % 1) * 100);
-      return String(h) + ':' +
-        String(m).padStart(2, '0') + ':' +
-        String(sec).padStart(2, '0') + '.' +
-        String(cs).padStart(2, '0');
-    };
-    const fontSize = Math.round(height * 0.042);
-    const marginV = Math.round(height * 0.05);
-    const header =
-      '[Script Info]\n' +
-      'ScriptType: v4.00+\n' +
-      'PlayResX: ' + width + '\n' +
-      'PlayResY: ' + height + '\n\n' +
-      '[V4+ Styles]\n' +
-      'Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, ' +
-      'Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, ' +
-      'BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding\n' +
-      'Style: Default,DejaVu Sans,' + fontSize +
-      ',&H00FFFFFF,&H000000FF,&H00000000,&H80000000' +
-      ',-1,0,0,0,100,100,0,0,3,0,0,2,30,30,' + marginV + ',1\n\n' +
-      '[Events]\n' +
-      'Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n';
-    const events = segments.map((seg) => {
-      const text = seg.text.trim().replace(/\n/g, '\\N');
-      return 'Dialogue: 0,' + toTC(seg.start) + ',' + toTC(seg.end) + ',Default,,0,0,0,,' + text;
-    }).join('\n');
-    return header + events + '\n';
   }
 
   app.get('/health', (req, res) => {
@@ -145,11 +111,31 @@ const express = require('express');
       vfFilters.push('vignette=PI/5');
 
       if (subtitle_segments && subtitle_segments.length > 0) {
-        const assPath = path.join(jobDir, 'subtitles.ass');
-        fs.writeFileSync(assPath, generateASS(subtitle_segments, width, height), 'utf8');
-        const escapedAss = assPath.replace(/\\/g, '/');
-        vfFilters.push("subtitles='" + escapedAss + "'");
-        console.log('[' + jobId + '] Subtitulos ASS: ' + subtitle_segments.length + ' segmentos');
+        const font = '/usr/share/fonts/dejavu/DejaVuSans-Bold.ttf';
+        const segs = subtitle_segments.slice(0, 30);
+        segs.forEach((seg) => {
+          const raw = (seg.text || '').trim().replace(/\n/g, ' ');
+          const text = raw
+            .replace(/\\/g, '\\\\\\\\')
+            .replace(/'/g, '\u2019')
+            .replace(/:/g, '\\:')
+            .replace(/%/g, '\\%')
+            .substring(0, 80);
+          if (!text) return;
+          const t0 = Number(seg.start).toFixed(3);
+          const t1 = Number(seg.end).toFixed(3);
+          vfFilters.push(
+            "drawtext=fontfile='" + font + "'" +
+            ":text='" + text + "'" +
+            ':fontsize=36' +
+            ':fontcolor=white' +
+            ':borderw=3:bordercolor=black@0.9' +
+            ':x=(w-text_w)/2' +
+            ':y=h-text_h-80' +
+            ":enable='between(t," + t0 + "," + t1 + ")'"
+          );
+        });
+        console.log('[' + jobId + '] Subtitulos drawtext: ' + segs.length + ' segmentos');
       }
 
       if (title) {
