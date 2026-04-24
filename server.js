@@ -1,4 +1,4 @@
-   const express = require('express');
+ const express = require('express');
   const { spawn } = require('child_process');
   const fs = require('fs');
   const path = require('path');
@@ -13,14 +13,12 @@
   if (!fs.existsSync(TEMP_DIR)) fs.mkdirSync(TEMP_DIR, { recursive: true });
 
   const CLOUDINARY_CLOUD = process.env.CLOUDINARY_CLOUD;
-  const CLOUDINARY_UPLOAD_PRESET = process.env.CLOUDINARY_UPLOAD_PRESET ||
-  'n8n_audio';
+  const CLOUDINARY_UPLOAD_PRESET = process.env.CLOUDINARY_UPLOAD_PRESET || 'n8n_audio';
 
   async function downloadFile(url, dest) {
     const response = await axios({
       url, method: 'GET', responseType: 'stream', timeout: 90000,
-      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; FFmpegService/1.0)'
-   }
+      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; FFmpegService/1.0)' }
     });
     const writer = fs.createWriteStream(dest);
     response.data.pipe(writer);
@@ -38,11 +36,9 @@
       proc.stdout.on('data', () => {});
       proc.on('close', code => {
         if (code === 0) resolve();
-        else reject(new Error('FFmpeg failed (code ' + code + '):\n' +
-  stderr.slice(-1500)));
+        else reject(new Error('FFmpeg failed (code ' + code + '):\n' + stderr.slice(-1500)));
       });
-      proc.on('error', err => reject(new Error('FFmpeg spawn error: ' +
-  err.message)));
+      proc.on('error', err => reject(new Error('FFmpeg spawn error: ' + err.message)));
     });
   }
 
@@ -62,8 +58,7 @@
   }
 
   app.get('/health', (req, res) => {
-    res.json({ status: 'ok', service: 'ffmpeg-render', cloudinary_cloud:
-  CLOUDINARY_CLOUD });
+    res.json({ status: 'ok', service: 'ffmpeg-render', cloudinary_cloud: CLOUDINARY_CLOUD });
   });
 
   app.post('/render', async (req, res) => {
@@ -78,13 +73,10 @@
       } = req.body;
 
       if (!audio_url) throw new Error('audio_url is required');
-      if (!segments.length) throw new Error('segments array is required and
-  cannot be empty');
-      if (!CLOUDINARY_CLOUD) throw new Error('CLOUDINARY_CLOUD env var not
-  set');
+      if (!segments.length) throw new Error('segments array is required and cannot be empty');
+      if (!CLOUDINARY_CLOUD) throw new Error('CLOUDINARY_CLOUD env var not set');
 
-      console.log('[' + jobId + '] Render started — ' + segments.length + '
-  segments');
+      console.log('[' + jobId + '] Render started — ' + segments.length + ' segments');
 
       const audioPath = path.join(jobDir, 'audio.mp3');
       await downloadFile(audio_url, audioPath);
@@ -97,15 +89,12 @@
         await downloadFile(segments[i].url, rawPath);
         const dur = segments[i].duration || 8;
         const scaleFilter = 'scale=' + width + ':' + height +
-  ':force_original_aspect_ratio=increase,crop=' + width + ':' + height +
-  ',setsar=1,fps=30';
-        await runFFmpeg(['-i', rawPath, '-t', String(dur), '-vf',
-  scaleFilter,
-          '-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '26', '-an',
-  scaledPath]);
+          ':force_original_aspect_ratio=increase,crop=' + width + ':' + height +
+          ',setsar=1,fps=30';
+        await runFFmpeg(['-i', rawPath, '-t', String(dur), '-vf', scaleFilter,
+          '-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '26', '-an', scaledPath]);
         scaledPaths.push(scaledPath);
-        console.log('[' + jobId + '] Segment ' + (i + 1) + '/' +
-  segments.length + ' processed');
+        console.log('[' + jobId + '] Segment ' + (i + 1) + '/' + segments.length + ' processed');
       }
 
       const concatPath = path.join(jobDir, 'concat.mp4');
@@ -122,15 +111,11 @@
           const offset = Math.max(0, cumDur - i * FADE).toFixed(3);
           const srcA = i === 1 ? '[0:v]' : '[xf' + (i - 1) + ']';
           const srcB = '[' + i + ':v]';
-          const dst = i === scaledPaths.length - 1 ? '[vout]' : '[xf' + i +
-  ']';
-          filterParts.push(srcA + srcB + 'xfade=transition=fade:duration=' +
-   FADE + ':offset=' + offset + dst);
+          const dst = i === scaledPaths.length - 1 ? '[vout]' : '[xf' + i + ']';
+          filterParts.push(srcA + srcB + 'xfade=transition=fade:duration=' + FADE + ':offset=' + offset + dst);
         }
-        await runFFmpeg([...inputArgs, '-filter_complex',
-  filterParts.join(';'),
-          '-map', '[vout]', '-c:v', 'libx264', '-preset', 'ultrafast',
-  '-crf', '26', '-an', concatPath]);
+        await runFFmpeg([...inputArgs, '-filter_complex', filterParts.join(';'),
+          '-map', '[vout]', '-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '26', '-an', concatPath]);
       }
       console.log('[' + jobId + '] Segments concatenated with crossfade');
 
@@ -145,21 +130,16 @@
         fs.writeFileSync(srtPath, generateSRT(subtitle_segments), 'utf8');
         const escapedSrt = srtPath.replace(/\\/g, '/');
         const subStyle = 'Fontname=DejaVu Sans
-  Bold,Fontsize=17,PrimaryColour=&H00FFFFFF,OutlineColour=&H00000000,Bold=1,
-  Outline=4,Shadow=2,Alignment=2,MarginV=130';
-        vfFilters.push("subtitles='" + escapedSrt + "':force_style='" +
-  subStyle + "'");
-        console.log('[' + jobId + '] Subtitulos: ' +
-  subtitle_segments.length + ' segmentos');
+  Bold,Fontsize=17,PrimaryColour=&H00FFFFFF,OutlineColour=&H00000000,Bold=1,Outline=4,Shadow=2,Alignment=2,MarginV=130';
+        vfFilters.push("subtitles='" + escapedSrt + "':force_style='" + subStyle + "'");
+        console.log('[' + jobId + '] Subtitulos: ' + subtitle_segments.length + ' segmentos');
       }
 
       if (title) {
-        const safeTitle = title.replace(/\\/g, '\\\\').replace(/'/g,
-  "'").replace(/:/g, '\\:').substring(0, 60);
+        const safeTitle = title.replace(/\\/g, '\\\\').replace(/'/g, "'").replace(/:/g, '\\:').substring(0, 60);
         const font = '/usr/share/fonts/dejavu/DejaVuSans-Bold.ttf';
-        const dtFilter = "drawtext=text='" + safeTitle + "':fontfile='" +
-  font + "':fontsize=46:fontcolor=white:borderw=3:bordercolor=black:x=(w-tex
-  t_w)/2:y=60";
+        const dtFilter = "drawtext=text='" + safeTitle + "':fontfile='" + font +
+  "':fontsize=46:fontcolor=white:borderw=3:bordercolor=black:x=(w-text_w)/2:y=60";
         vfFilters.push(dtFilter);
       }
 
@@ -179,28 +159,22 @@
       form.append('public_id', 'viral_' + jobId);
 
       const uploadRes = await axios.post(
-        'https://api.cloudinary.com/v1_1/' + CLOUDINARY_CLOUD +
-  '/video/upload',
+        'https://api.cloudinary.com/v1_1/' + CLOUDINARY_CLOUD + '/video/upload',
         form,
-        { headers: form.getHeaders(), maxBodyLength: Infinity,
-  maxContentLength: Infinity, timeout: 180000 }
+        { headers: form.getHeaders(), maxBodyLength: Infinity, maxContentLength: Infinity, timeout: 180000 }
       );
 
       const videoUrl = uploadRes.data.secure_url;
       console.log('[' + jobId + '] Uploaded: ' + videoUrl);
-      res.json({ success: true, url: videoUrl, public_id:
-  uploadRes.data.public_id, job_id: jobId });
+      res.json({ success: true, url: videoUrl, public_id: uploadRes.data.public_id, job_id: jobId });
 
     } catch (err) {
       console.error('[' + jobId + '] ERROR:', err.message);
-      res.status(500).json({ success: false, error: err.message, job_id:
-  jobId });
+      res.status(500).json({ success: false, error: err.message, job_id: jobId });
     } finally {
-      try { fs.rmSync(jobDir, { recursive: true, force: true }); } catch (_)
-   {}
+      try { fs.rmSync(jobDir, { recursive: true, force: true }); } catch (_) {}
     }
   });
 
   const PORT = process.env.PORT || 3000;
-  app.listen(PORT, () => console.log('FFmpeg Render Service running on port
-  ' + PORT));
+  app.listen(PORT, '0.0.0.0', () => console.log('FFmpeg Render Service running on port ' + PORT));
